@@ -1,0 +1,10 @@
+<launch>
+
+    <include file="$(find-pkg-share rrm_sim)/launch/rrm_sim.launch.xml"/>
+
+    <node pkg="block1_Maszay"
+          exec="logger_node"
+          name="joint_logger"
+          output="screen"/>
+
+</launch>
