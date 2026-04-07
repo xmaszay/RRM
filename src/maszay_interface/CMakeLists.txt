@@ -8,11 +8,15 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
 "srv/SavePoint.srv"
 "srv/PlayTrajectory.srv"
-#DEPENDENCIES geometry_msgs
+"srv/SolveAllIK.srv"
+"srv/SolveBestIK.srv"
+"srv/MoveToPoint.srv"
+DEPENDENCIES geometry_msgs
 )
 # uncomment the following section in order to fill in
 # further dependencies manually.

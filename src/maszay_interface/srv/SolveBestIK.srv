@@ -1,0 +1,6 @@
+geometry_msgs/Point target
+float64[] current_joints
+---
+bool success
+string message
+float64[] solution
