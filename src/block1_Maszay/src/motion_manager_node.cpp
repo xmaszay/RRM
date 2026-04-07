@@ -14,7 +14,7 @@ class MotionManagerNode : public rclcpp::Node
 {
 public:
     MotionManagerNode()
-        : Node("motion_manager_node"), /
+        : Node("motion_manager_node"), 
           has_joint_state_(false)      // na začiatku ešte nepoznáme aktuálny stav robota
     {
         // počiatočné nastavenie jointov

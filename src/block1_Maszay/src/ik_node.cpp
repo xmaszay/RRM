@@ -18,25 +18,28 @@ class IKNode : public rclcpp::Node
 {
 public:
     IKNode()
-        : Node("ik_node"),     
-          l2_(0.203),          // dĺžka druhého článku robota
-          l3_(0.203)           // dĺžka tretieho článku robota
+    : Node("ik_node"),
+      l2_(0.203),
+      l3_(0.203)
+{
+    if (!loadJointLimitsFromURDF())
     {
-
-        // service, ktorá vráti všetky validné IK riešenia pre zadaný bod
-        solve_all_service_ = this->create_service<maszay_interface::srv::SolveAllIK>(
-            "solve_all_ik",
-            std::bind(&IKNode::handleSolveAllIK, this,
-                      std::placeholders::_1, std::placeholders::_2));
-
-        // service, ktorá vráti iba najlepšie IK riešenie vzhľadom na aktuálny stav robota
-        solve_best_service_ = this->create_service<maszay_interface::srv::SolveBestIK>(
-            "solve_best_ik",
-            std::bind(&IKNode::handleSolveBestIK, this,
-                      std::placeholders::_1, std::placeholders::_2));
-
-        RCLCPP_INFO(this->get_logger(), "IK node initialized");
+        RCLCPP_FATAL(this->get_logger(), "Failed to load joint limits from URDF");
+        throw std::runtime_error("Failed to load joint limits from URDF");
     }
+
+    solve_all_service_ = this->create_service<maszay_interface::srv::SolveAllIK>(
+        "solve_all_ik",
+        std::bind(&IKNode::handleSolveAllIK, this,
+                  std::placeholders::_1, std::placeholders::_2));
+
+    solve_best_service_ = this->create_service<maszay_interface::srv::SolveBestIK>(
+        "solve_best_ik",
+        std::bind(&IKNode::handleSolveBestIK, this,
+                  std::placeholders::_1, std::placeholders::_2));
+
+    RCLCPP_INFO(this->get_logger(), "IK node initialized");
+}
 
 private:
     // pomocná štruktúra na uloženie jedného IK riešenia
@@ -356,9 +359,18 @@ private:
 
 int main(int argc, char ** argv)
 {
-    rclcpp::init(argc, argv);                    
-    auto node = std::make_shared<IKNode>();     
-    rclcpp::spin(node);                         // spracovanie callbackov a iných volaní
-    rclcpp::shutdown();                         
+    rclcpp::init(argc, argv);
+
+    try
+    {
+        auto node = std::make_shared<IKNode>();
+        rclcpp::spin(node);
+    }
+    catch (const std::exception & e)
+    {
+        std::cerr << "IK node failed to start: " << e.what() << std::endl;
+    }
+
+    rclcpp::shutdown();
     return 0;
 }
