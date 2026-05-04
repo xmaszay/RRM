@@ -19,31 +19,36 @@ public:
         joint_pub_ = this->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 10);
         joint_names_ = {"joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6"};
 
-        Manipulator::JointVector q_t1 = {
-            -0.346254, 0.197993, -0.105621, -1.563038, -0.344984, 1.532185
-        };
+       Manipulator::JointVector q_t1 = {
+    -0.335961, 0.189184, -0.083887, 1.863155, 0.351478, -1.881027
+};
 
-        Manipulator::JointVector q_t2 = {
-            0.212505, 0.141679, -0.044757, 1.521074, -0.212008, -1.506295
-        };
+Manipulator::Pose pose_t1 = makePoseQuat(
+    1.378681, -0.434293, 1.452074,
+    0.000000, 0.706824, 0.000000, 0.707390
+);
 
-        Manipulator::Pose pose_t1 = makePoseQuat(
-            1.380018, -0.449362, 1.451754,
-            -0.000000, 0.736001, -0.000000, 0.676980
-        );
+const double edge1_length = 0.685024;
 
-        Manipulator::Pose pose_t2 = makePoseQuat(
-            1.380366, 0.268806, 1.455895,
-            -0.001664, 0.736000, -0.001530, 0.676978
-        );
+Manipulator::Pose pose_t2 = pose_t1;
+pose_t2.translation() += Eigen::Vector3d(0.0, edge1_length, 0.0);
 
         Manipulator::Pose pose_approach_t1 = manipulator_.offsetAlongToolX(pose_t1, -0.15);
         Manipulator::Pose pose_retract_t2  = manipulator_.offsetAlongToolX(pose_t2, -0.15);
 
         try {
-            auto traj_approach = manipulator_.generateLIN(pose_approach_t1, pose_t1, q_t1, 2.0, 0.01);
-            auto traj_machining = manipulator_.generateLIN(pose_t1, pose_t2, q_t1, 4.0, 0.01);
-            auto traj_retract = manipulator_.generateLIN(pose_t2, pose_retract_t2, q_t2, 2.0, 0.01);
+            Manipulator::JointVector q_approach_t1 = q_t1;
+
+            auto traj_approach = manipulator_.generateLIN(
+                pose_approach_t1, pose_t1, q_approach_t1, 2.0, 0.01);
+
+            auto traj_machining = manipulator_.generateLIN(
+                pose_t1, pose_t2, q_t1, 4.0, 0.01);
+
+            Manipulator::JointVector q_t2_cartesian = traj_machining.back().q;
+
+            auto traj_retract = manipulator_.generateLIN(
+                pose_t2, pose_retract_t2, q_t2_cartesian, 2.0, 0.01);
 
             appendTrajectory(traj_approach);
             appendTrajectory(traj_machining);
@@ -59,19 +64,25 @@ public:
     }
 
 private:
-    Manipulator::Pose makePoseQuat(double x, double y, double z,
-                                   double qx, double qy, double qz, double qw)
+    Manipulator::Pose makePoseQuat(
+        double x, double y, double z,
+        double qx, double qy, double qz, double qw)
     {
         Eigen::Translation3d translation(Eigen::Vector3d(x, y, z));
         Eigen::Quaterniond q(qw, qx, qy, qz);
 
         Manipulator::Pose pose = Manipulator::Pose::Identity();
         pose = translation * q.normalized();
+
         return pose;
     }
 
     void appendTrajectory(const std::vector<Manipulator::Sample> &segment)
     {
+        if (segment.empty()) {
+            return;
+        }
+
         if (trajectory_.empty()) {
             trajectory_ = segment;
             return;

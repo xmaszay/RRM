@@ -29,21 +29,27 @@ public:
         joint_pub_ = this->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 10);
 
         joint_names_ = {"joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6"};
+
+        // Startovacia konfigurácia robota
         current_q_ = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
+        // Počiatočná póza gizma sa nevymýšľa ručne,
+        // ale vypočíta sa cez FK z aktuálnych kĺbov.
+        Eigen::Affine3d initial_tool_pose = ikfast_abb::computeFk(current_q_);
+
         publishJointState(current_q_);
-        makeInteractiveMarker();
+        makeInteractiveMarker(initial_tool_pose);
 
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds(50),
             std::bind(&PoseTeacher::publishCurrentJointState, this));
 
         RCLCPP_INFO(this->get_logger(), "pose_teacher started");
-        RCLCPP_INFO(this->get_logger(), "Move the interactive marker in RViz.");
+        RCLCPP_INFO(this->get_logger(), "Interactive marker initialized from FK at q = [0,0,0,0,0,0].");
     }
 
 private:
-    void makeInteractiveMarker()
+    void makeInteractiveMarker(const Eigen::Affine3d &initial_pose)
     {
         visualization_msgs::msg::InteractiveMarker int_marker;
         int_marker.header.frame_id = "base_link";
@@ -51,10 +57,8 @@ private:
         int_marker.description = "Pose Teacher";
         int_marker.scale = 0.35;
 
-        int_marker.pose.position.x = 1.0;
-        int_marker.pose.position.y = 0.3;
-        int_marker.pose.position.z = 1.2;
-        int_marker.pose.orientation.w = 1.0;
+        // Marker sa nastaví na reálnu TCP pózu vypočítanú cez FK
+        int_marker.pose = eigenToPoseMsg(initial_pose);
 
         addVisibleControl(int_marker);
         add6DofControls(int_marker);
@@ -64,6 +68,44 @@ private:
             std::bind(&PoseTeacher::processFeedback, this, std::placeholders::_1));
 
         server_->applyChanges();
+    }
+
+    geometry_msgs::msg::Pose eigenToPoseMsg(const Eigen::Affine3d &pose)
+    {
+        geometry_msgs::msg::Pose msg;
+
+        Eigen::Vector3d p = pose.translation();
+        Eigen::Quaterniond q(pose.rotation());
+        q.normalize();
+
+        msg.position.x = p.x();
+        msg.position.y = p.y();
+        msg.position.z = p.z();
+
+        msg.orientation.x = q.x();
+        msg.orientation.y = q.y();
+        msg.orientation.z = q.z();
+        msg.orientation.w = q.w();
+
+        return msg;
+    }
+
+    Eigen::Affine3d poseMsgToEigen(const geometry_msgs::msg::Pose &pose_msg)
+    {
+        Eigen::Translation3d translation(
+            pose_msg.position.x,
+            pose_msg.position.y,
+            pose_msg.position.z);
+
+        Eigen::Quaterniond q(
+            pose_msg.orientation.w,
+            pose_msg.orientation.x,
+            pose_msg.orientation.y,
+            pose_msg.orientation.z);
+
+        q.normalize();
+
+        return translation * q;
     }
 
     void addVisibleControl(visualization_msgs::msg::InteractiveMarker &int_marker)
@@ -77,6 +119,7 @@ private:
         marker.scale.x = 0.08;
         marker.scale.y = 0.08;
         marker.scale.z = 0.08;
+
         marker.color.r = 0.1f;
         marker.color.g = 0.8f;
         marker.color.b = 0.1f;
@@ -92,10 +135,12 @@ private:
 
         InteractiveMarkerControl control;
 
+        // X axis
         control.orientation.w = 1;
         control.orientation.x = 1;
         control.orientation.y = 0;
         control.orientation.z = 0;
+
         control.name = "rotate_x";
         control.interaction_mode = InteractiveMarkerControl::ROTATE_AXIS;
         int_marker.controls.push_back(control);
@@ -104,10 +149,12 @@ private:
         control.interaction_mode = InteractiveMarkerControl::MOVE_AXIS;
         int_marker.controls.push_back(control);
 
+        // Y axis
         control.orientation.w = 1;
         control.orientation.x = 0;
         control.orientation.y = 1;
         control.orientation.z = 0;
+
         control.name = "rotate_y";
         control.interaction_mode = InteractiveMarkerControl::ROTATE_AXIS;
         int_marker.controls.push_back(control);
@@ -116,10 +163,12 @@ private:
         control.interaction_mode = InteractiveMarkerControl::MOVE_AXIS;
         int_marker.controls.push_back(control);
 
+        // Z axis
         control.orientation.w = 1;
         control.orientation.x = 0;
         control.orientation.y = 0;
         control.orientation.z = 1;
+
         control.name = "rotate_z";
         control.interaction_mode = InteractiveMarkerControl::ROTATE_AXIS;
         int_marker.controls.push_back(control);
@@ -146,49 +195,28 @@ private:
         auto best_solution = selectNearestSolution(solutions, current_q_);
         current_q_ = best_solution;
 
-       if (feedback->event_type == visualization_msgs::msg::InteractiveMarkerFeedback::MOUSE_UP) {
-    RCLCPP_INFO(
-        this->get_logger(),
-        "Joint values: [%.6f, %.6f, %.6f, %.6f, %.6f, %.6f]",
-        current_q_[0], current_q_[1], current_q_[2],
-        current_q_[3], current_q_[4], current_q_[5]);
+        if (feedback->event_type == visualization_msgs::msg::InteractiveMarkerFeedback::MOUSE_UP) {
+            RCLCPP_INFO(
+                this->get_logger(),
+                "Joint values: [%.6f, %.6f, %.6f, %.6f, %.6f, %.6f]",
+                current_q_[0], current_q_[1], current_q_[2],
+                current_q_[3], current_q_[4], current_q_[5]);
 
-    RCLCPP_INFO(
-        this->get_logger(),
-        "Pose position: [%.6f, %.6f, %.6f]",
-        feedback->pose.position.x,
-        feedback->pose.position.y,
-        feedback->pose.position.z);
+            RCLCPP_INFO(
+                this->get_logger(),
+                "Pose position: [%.6f, %.6f, %.6f]",
+                feedback->pose.position.x,
+                feedback->pose.position.y,
+                feedback->pose.position.z);
 
-    RCLCPP_INFO(
-        this->get_logger(),
-        "Pose orientation (quat): [%.6f, %.6f, %.6f, %.6f]",
-        feedback->pose.orientation.x,
-        feedback->pose.orientation.y,
-        feedback->pose.orientation.z,
-        feedback->pose.orientation.w);
-}
-    }
-
-    void publishCurrentJointState()
-    {
-        publishJointState(current_q_);
-    }
-
-    Eigen::Affine3d poseMsgToEigen(const geometry_msgs::msg::Pose &pose_msg)
-    {
-        Eigen::Translation3d translation(
-            pose_msg.position.x,
-            pose_msg.position.y,
-            pose_msg.position.z);
-
-        Eigen::Quaterniond q(
-            pose_msg.orientation.w,
-            pose_msg.orientation.x,
-            pose_msg.orientation.y,
-            pose_msg.orientation.z);
-
-        return translation * q;
+            RCLCPP_INFO(
+                this->get_logger(),
+                "Pose orientation (quat): [%.6f, %.6f, %.6f, %.6f]",
+                feedback->pose.orientation.x,
+                feedback->pose.orientation.y,
+                feedback->pose.orientation.z,
+                feedback->pose.orientation.w);
+        }
     }
 
     ikfast_abb::JointValues selectNearestSolution(
@@ -200,6 +228,7 @@ private:
 
         for (const auto &sol : solutions) {
             double dist = 0.0;
+
             for (size_t i = 0; i < 6; ++i) {
                 double d = sol[i] - reference[i];
                 dist += d * d;
@@ -210,7 +239,13 @@ private:
                 best = sol;
             }
         }
+
         return best;
+    }
+
+    void publishCurrentJointState()
+    {
+        publishJointState(current_q_);
     }
 
     void publishJointState(const ikfast_abb::JointValues &q)
@@ -219,6 +254,7 @@ private:
         msg.header.stamp = this->now();
         msg.name = joint_names_;
         msg.position.assign(q.begin(), q.end());
+
         joint_pub_->publish(msg);
     }
 

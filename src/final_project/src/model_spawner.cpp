@@ -36,12 +36,12 @@ private:
         marker.mesh_resource = "package://final_project/meshes/tie.stl";
         marker.mesh_use_embedded_materials = false;
 
-        // Poloha objektu pred robotom
+        // poloha objektu pred robotom
         marker.pose.position.x = 2.0;
         marker.pose.position.y = 0.5;
         marker.pose.position.z = 0.0;
 
-        // Zatial bez rotacie
+        // rotacia
         marker.pose.orientation.x = 0.0;
         marker.pose.orientation.y = 0.0;
         marker.pose.orientation.z = 0.0;

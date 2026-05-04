@@ -268,8 +268,8 @@ Manipulator::Pose Manipulator::offsetAlongToolX(const Pose &pose, double offset)
 {
     Pose result = pose;
 
-    Eigen::Vector3d local_x = pose.linear().col(0);
-    result.translation() = pose.translation() + offset * local_x;
+    Eigen::Vector3d local_z = pose.linear().col(2);
+    result.translation() = pose.translation() + offset * local_z;
 
     return result;
 }

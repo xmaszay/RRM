@@ -14,6 +14,7 @@ find_package(interactive_markers REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(abb_irb4600_ikfast REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 
 add_library(manipulator_lib src/manipulator.cpp)
 target_include_directories(manipulator_lib PUBLIC
@@ -79,6 +80,9 @@ ament_target_dependencies(manipulator_executor
   rclcpp
   sensor_msgs
   std_msgs
+  std_srvs
+  visualization_msgs
+  geometry_msgs
   abb_irb4600_ikfast
 )
 target_link_libraries(manipulator_executor manipulator_lib)
@@ -102,6 +106,16 @@ install(DIRECTORY include/
 
 install(DIRECTORY
   meshes
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY
+  rviz
   DESTINATION share/${PROJECT_NAME}
 )
 
